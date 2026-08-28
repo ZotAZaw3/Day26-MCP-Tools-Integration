@@ -135,6 +135,106 @@ Resource `server://info` cho client tự dò:
 python client.py
 ```
 
+## Bằng chứng tool chạy được
+
+Tự kiểm tra lại toàn bộ bằng 2 lệnh:
+
+```bash
+python client.py            # tools + versioning (stdio)
+python client.py --http     # auth, cần server HTTP chạy ở terminal khác
+```
+
+### 1. Server khai báo đủ 3 tool và client chọn đúng version
+
+```
+$ python client.py
+Server: lab-tracker v2.0.0
+Tools: ['check_labs', 'check_labs_v2', 'find_lab']
+
+-> dùng check_labs_v2 (JSON)
+   10 repo cần xử lý (api 2.0)
+   - Day17-Track3-ZepMemory4Agent: 1 bẩn, 0 chưa push
+   - Day26-MCP-Tools-Integration: 1 bẩn, 0 chưa push
+   - K4-Day-11-Guardrails-HITL-Responsible-AI: 0 bẩn, 2 chưa push
+   - K4-Day03-B1-1-E403: 2 bẩn, 0 chưa push
+   - K4-Day08-RAG-Pipeline-FIFO: 2 bẩn, 0 chưa push
+
+[client cũ vẫn hoạt động] 10 dòng
+```
+
+Dòng cuối chứng minh `check_labs` (v1) vẫn chạy bình thường trên server v2.
+
+### 2. Output thật của từng tool
+
+```
+check_labs(dirty_only=True)
+  Day17-Track3-ZepMemory4Agent [main]: 1 file chưa commit
+```
+
+```jsonc
+// check_labs_v2(dirty_only=True) — một phần tử trong "labs"
+{
+  "name": "Day17-Track3-ZepMemory4Agent",
+  "path": "C:\\Users\\Long\\Desktop\\Việc\\AI20K\\Lab\\Day17-Track3-ZepMemory4Agent",
+  "branch": "main",
+  "dirty_count": 1,
+  "unpushed": 0,
+  "behind": 0,
+  "has_upstream": true,
+  "last_commit": {
+    "sha": "e4c58ac",
+    "date": "2026-08-17T17:36:21+07:00",
+    "message": "Update privacy.png with delete + verify output."
+  }
+}
+```
+
+```jsonc
+// find_lab("day18")
+{
+  "keyword": "day18",
+  "count": 1,
+  "results": [
+    {
+      "name": "K34-Day18-Production-RAG",
+      "path": "C:\\Users\\Long\\Desktop\\Việc\\AI20K\\Lab\\K34-Day18-Production-RAG",
+      "title": "Lab 18: Production RAG Pipeline"
+    }
+  ]
+}
+```
+
+Số liệu trên đọc trực tiếp từ `git`, nên chạy lại ở máy khác sẽ ra kết quả khác —
+đúng như kỳ vọng với tool dùng dữ liệu thật.
+
+### 3. Claude Code kết nối được
+
+```
+$ claude mcp list
+Checking MCP server health…
+
+lab-tracker: .../.venv/Scripts/python.exe .../my-mcp-server/server.py - ✔ Connected
+```
+
+### 4. Auth chặn đúng
+
+```
+$ python client.py --http
+Token đúng : OK — thấy 3 tool
+Không token: TỪ CHỐI — HTTP 401
+Token sai  : TỪ CHỐI — HTTP 401
+```
+
+## Bảo mật
+
+Repo không chứa credential thật:
+
+- `.env` nằm trong `.gitignore` và chưa từng được commit
+  (`git log --all -- .env` trả về rỗng).
+- Token trong `VALID_TOKENS` là token demo (`dev-token-abc123`), ghi đè bằng
+  biến môi trường `MCP_AUTH_TOKEN` khi chạy thật.
+- Server không đọc, không log và không trả về nội dung file `.env` của bất kỳ lab nào.
+
 ## Files
 
 ```
