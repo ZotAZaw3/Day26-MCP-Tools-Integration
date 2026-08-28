@@ -18,14 +18,48 @@ day26-mcp/
 │   ├── weather_server.py
 │   └── weather_client.py
 │
-└── 03-production/           ← Bước 3: Auth, Tool Registry, Versioning
+├── 03-production/           ← Bước 3: Auth, Tool Registry, Versioning
+│   ├── README.md
+│   ├── auth_server.py
+│   ├── auth_client.py
+│   ├── registry.json
+│   ├── registry_client.py
+│   └── versioned_server.py
+│
+└── my-mcp-server/           ← Bài thực hành: Lab Tracker MCP Server
     ├── README.md
-    ├── auth_server.py
-    ├── auth_client.py
-    ├── registry.json
-    ├── registry_client.py
-    └── versioned_server.py
+    ├── server.py
+    ├── client.py
+    └── requirements.txt
 ```
+
+## Bài thực hành — Lab Tracker MCP Server
+
+MCP server tự xây cho một việc làm tay hằng ngày: kiểm tra hơn 20 repo lab
+trong `AI20K/Lab/` xem repo nào chưa commit hoặc quên push. Dữ liệu đọc thật
+bằng `git`, không hard-code.
+
+| Tool | Input | Output |
+|------|-------|--------|
+| `check_labs` | `dirty_only: bool = False` | `str` — mỗi repo một dòng tóm tắt (v1, giữ cho client cũ) |
+| `check_labs_v2` | `dirty_only`, `include_files`, `limit` (đều optional) | JSON: `name, path, branch, dirty_count, unpushed, behind, last_commit` |
+| `find_lab` | `keyword: str` | JSON: các lab khớp tên folder hoặc tiêu đề README |
+
+Có sẵn resource `server://info` để client dò version, `TokenVerifier` cho
+transport `streamable-http`, và tool v1/v2 song song để giữ tương thích ngược.
+
+```bash
+cd my-mcp-server
+python server.py                                   # stdio
+MCP_TRANSPORT=http python server.py                # HTTP + bearer token
+
+python client.py            # test versioning
+python client.py --http     # test auth: token đúng / thiếu / sai
+
+claude mcp add lab-tracker -- python "$PWD/server.py"
+```
+
+Chi tiết use case, input/output, auth và versioning: [my-mcp-server/README.md](my-mcp-server/README.md).
 
 ## Quick start
 
