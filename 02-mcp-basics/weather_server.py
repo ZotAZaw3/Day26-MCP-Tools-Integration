@@ -20,9 +20,15 @@ from mcp.server.mcpserver import MCPServer
 mcp = MCPServer("weather")
 
 _MOCK_DB = {
-    "Hanoi": "29°C, trời mưa",
-    "Haiphong": "33°C, mưa rào",
-    "Danang": "30°C, nhiều mây",
+    "Hanoi": "29°C, trời mưa, rất dày bụi",
+    "Haiphong": "33°C, mưa rào, mát mẻ",
+    "Danang": "30°C, nhiều mây, không khí chỗ nóng chỗ lạnh",
+}
+
+_MOCK_AQI = {
+    "Hanoi": "AQI 168 (xấu) — PM2.5 cao, nên đeo khẩu trang khi ra đường",
+    "Haiphong": "AQI 92 (trung bình) — nhóm nhạy cảm hạn chế ra ngoài lâu",
+    "Danang": "AQI 45 (tốt) — không khí trong lành",
 }
 
 
@@ -30,6 +36,12 @@ _MOCK_DB = {
 def get_weather(city: str) -> str:
     """Lấy thời tiết hiện tại của một thành phố."""
     return f"{city}: {_MOCK_DB.get(city, '28°C, không có dữ liệu chi tiết')}"
+
+
+@mcp.tool()
+def get_air_quality(city: str) -> str:
+    """Lấy chất lượng không khí (AQI) hiện tại của một thành phố."""
+    return f"{city}: {_MOCK_AQI.get(city, 'không có dữ liệu AQI')}"
 
 
 if __name__ == "__main__":

@@ -1,20 +1,27 @@
 """Minh hoạ FUNCTION CALLING thuần với Google Gemini SDK.
 
-Tool `get_weather` được định nghĩa schema thủ công VÀ thực thi ngay trong
-chính file app này. Model chỉ QUYẾT ĐỊNH gọi tool nào; app mới là nơi chạy.
+Tool `get_weather` (mock) và `get_forecast` (dữ liệu THẬT qua Google Search)
+được định nghĩa schema thủ công VÀ thực thi ngay trong chính file app này.
+Model chỉ QUYẾT ĐỊNH gọi tool nào; app mới là nơi chạy.
 
 Cách chạy:
     pip install -r ../requirements.txt
-    export GEMINI_API_KEY=...
+    # đặt GEMINI_API_KEY trong file .env ở thư mục gốc repo
     python weather_function_calling.py
 """
 
+import os
+
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+load_dotenv()  # đọc GEMINI_API_KEY từ .env (không hardcode key)
+
 client = genai.Client()
 
-MODEL = "gemini-2.5-flash"
+# alias "-latest" luôn trỏ tới bản Flash mới nhất, khỏi phải sửa số version
+MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
 SYSTEM_INSTRUCTION = (
     "Bạn là trợ lý thời tiết thân thiện, trả lời bằng tiếng Việt tự nhiên. "
@@ -38,7 +45,29 @@ get_weather_declaration = types.FunctionDeclaration(
     ),
 )
 
-TOOLS = [types.Tool(function_declarations=[get_weather_declaration])]
+get_forecast_declaration = types.FunctionDeclaration(
+    name="get_forecast",
+    description=(
+        "Lấy DỰ BÁO thời tiết vài ngày tới của một thành phố. "
+        "Dữ liệu thật, tra cứu trực tiếp trên web."
+    ),
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "city": types.Schema(type=types.Type.STRING, description="Tên thành phố"),
+            "days": types.Schema(
+                type=types.Type.INTEGER, description="Số ngày dự báo, 1-7 (mặc định 3)"
+            ),
+        },
+        required=["city"],
+    ),
+)
+
+TOOLS = [
+    types.Tool(
+        function_declarations=[get_weather_declaration, get_forecast_declaration]
+    )
+]
 
 
 # 2. App tự thực thi tool (trong thực tế sẽ gọi API thời tiết thật)
@@ -70,6 +99,27 @@ def get_weather(city: str) -> str:
     return json.dumps({"city": city, **mock_data.get(city, default)}, ensure_ascii=False)
 
 
+# 2b. Tool dùng DỮ LIỆU THẬT: hỏi Gemini kèm Google Search grounding
+def get_forecast(city: str, days: int = 3) -> str:
+    """Tra dự báo *days* ngày tới của *city* bằng Google Search (dữ liệu thật)."""
+    days = max(1, min(int(days), 7))
+    resp = client.models.generate_content(
+        model=MODEL,
+        contents=(
+            f"Tra cứu dự báo thời tiết {days} ngày tới cho {city}. "
+            "Mỗi ngày một dòng: ngày - nhiệt độ thấp/cao - tình trạng - "
+            "xác suất mưa. Chỉ liệt kê dữ liệu, không bình luận."
+        ),
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        ),
+    )
+    return resp.text or f"Không tra được dự báo cho {city}"
+
+
+TOOL_IMPLS = {"get_weather": get_weather, "get_forecast": get_forecast}
+
+
 def run(prompt: str) -> str:
     """Gửi *prompt* tới Gemini, tự động xử lý function calling và trả về câu trả lời cuối."""
     contents: list[types.Content] = [
@@ -94,7 +144,7 @@ def run(prompt: str) -> str:
         function_responses = []
         for fc in resp.function_calls:
             print(f"  [model yêu cầu] {fc.name}({fc.args})")
-            result = get_weather(**fc.args)  # <-- app chạy, không phải model
+            result = TOOL_IMPLS[fc.name](**fc.args)  # <-- app chạy, không phải model
             print(f"  [app thực thi]  -> {result}")
             function_responses.append(
                 types.Part.from_function_response(
@@ -118,6 +168,6 @@ def run(prompt: str) -> str:
 
 
 if __name__ == "__main__":
-    question = "Thời tiết Hà Nội và Đà Nẵng hôm nay thế nào?"
+    question = "Thời tiết Hà Nội hôm nay thế nào, và 3 ngày tới ở Đà Nẵng ra sao?"
     print(f"User: {question}\n")
     print("Trả lời:", run(question))
