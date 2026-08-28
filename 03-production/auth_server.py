@@ -26,7 +26,7 @@ from mcp.server.mcpserver import MCPServer
 # --- Token store (production: dùng DB, Redis, hoặc JWT verification) ---
 VALID_TOKENS: dict[str, str] = {
     os.environ.get("MCP_AUTH_TOKEN", "dev-token-abc123"): "dev-user",
-    "prod-key-xyz789": "prod-service",
+    "demo-key-xyz789": "demo-service",
 }
 
 
